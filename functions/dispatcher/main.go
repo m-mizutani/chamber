@@ -5,10 +5,10 @@ import (
 	"os"
 
 	"github.com/aws/aws-lambda-go/events"
-	awsLambda "github.com/aws/aws-lambda-go/lambda"
+	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/lambda"
+	lambdaService "github.com/aws/aws-sdk-go/service/lambda"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -30,10 +30,10 @@ func handler(args argument) (result, error) {
 	ssn := session.Must(session.NewSession(&aws.Config{
 		Region: aws.String(args.awsRegion),
 	}))
-	svc := lambda.New(ssn)
+	svc := lambdaService.New(ssn)
 
 	for _, record := range args.event.Records {
-		input := &lambda.InvokeInput{
+		input := &lambdaService.InvokeInput{
 			FunctionName:   aws.String(args.lambdaArn),
 			InvocationType: aws.String("Event"),
 			Payload:        record.Kinesis.Data,
@@ -66,5 +66,5 @@ func main() {
 	log.SetLevel(log.InfoLevel)
 	log.SetFormatter(&log.JSONFormatter{})
 
-	awsLambda.Start(handleRequest)
+	lambda.Start(handleRequest)
 }
