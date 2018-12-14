@@ -1,0 +1,153 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'Chamber'
+Parameters:
+  LambdaArn:
+    Type: String
+  DlqSnsArn:
+    Type: String
+  KinesisStreamArn:
+    Type: String
+
+  # Optional parameters
+  LambdaRoleArn:
+    Type: String
+    Default: ""
+
+Conditions:
+  LambdaRoleRequired:
+    Fn::Equals: [ { Ref: LambdaRoleArn }, "" ]
+
+Resources:
+  # ----------------------------------------
+  # Lambda Functions
+  Dispatcher:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: build
+      Handler: dispatcher
+      Runtime: go1.x
+      Timeout: 30
+      MemorySize: 128
+      Role:
+        Fn::If: [ LambdaRoleRequired, {"Fn::GetAtt": LambdaRole.Arn}, {Ref: LambdaRoleArn} ]
+      Environment:
+        Variables:
+          TARGET_LAMBDA_ARN:
+            Ref: LambdaArn
+      Events:
+        EventStream:
+          Type: Kinesis
+          Properties:
+            Stream:
+              Ref: KinesisStreamArn
+            StartingPosition: TRIM_HORIZON
+            BatchSize: 10
+
+  Catcher:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: build
+      Handler: catcher
+      Runtime: go1.x
+      Timeout: 300
+      MemorySize: 128
+      Role:
+        Fn::If: [ LambdaRoleRequired, {"Fn::GetAtt": LambdaRole.Arn}, {Ref: LambdaRoleArn} ]
+      Environment:
+        Variables:
+          ERROR_TABLE:
+            Ref: ErrorTable
+
+  Reloader:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: build
+      Handler: reloader
+      Runtime: go1.x
+      Timeout: 300
+      MemorySize: 128
+      Role:
+        Fn::If: [ LambdaRoleRequired, {"Fn::GetAtt": LambdaRole.Arn}, {Ref: LambdaRoleArn} ]
+      Environment:
+        Variables:
+          ERROR_TABLE:
+            Ref: ErrorTable
+      Events:
+        ErrorTable:
+          Type: DynamoDB
+          Properties:
+            Stream:
+              Fn::GetAtt: ErrorTable.StreamArn
+            StartingPosition: TRIM_HORIZON
+            BatchSize: 10
+
+  # ----------------------------------------
+  # DynamoDB
+  ErrorTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: s3key
+        AttributeType: S
+      KeySchema:
+      - AttributeName: s3key
+        KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+
+  # ----------------------------------------
+  # IAM role
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Condition: LambdaRoleRequired
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service: ["lambda.amazonaws.com"]
+            Action: ["sts:AssumeRole"]
+      Path: "/"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      Policies:
+        - PolicyName: "ChamberLambdaPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:GetItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                  - dynamodb:UpdateItem
+                Resource:
+                  - Fn::GetAtt: ErrorTable.Arn
+                  - Fn::Sub: [ "${TableArn}/index/*", { TableArn: { "Fn::GetAtt": ErrorTable.Arn } } ]
+              - Effect: "Allow"
+                Action:
+                  - lambda:InvokeFunction
+                Resource:
+                  - {"Ref": LambdaArn}
+              - Effect: "Allow"
+                Action:
+                  - kinesis:DescribeStream
+                  - kinesis:GetShardIterator
+                  - kinesis:GetRecords
+                Resource:
+                  - Ref: KinesisStreamArn
+              - Effect: "Allow"
+                Action:
+                  - dynamodb:GetRecords
+                  - dynamodb:GetShardIterator
+                  - dynamodb:DescribeStream
+                  - dynamodb:ListStreams
+                Resource:
+                  - Fn::Sub: [ "${TableArn}/stream/*", { TableArn: { "Fn::GetAtt": ErrorTable.Arn } } ]
