@@ -6,7 +6,7 @@ require (
 	github.com/cenkalti/backoff v2.1.0+incompatible // indirect
 	github.com/google/uuid v1.1.0
 	github.com/guregu/dynamo v1.0.0
-	github.com/m-mizutani/generalprobe v0.0.0-20181215092048-efcbedccf0e2
+	github.com/m-mizutani/generalprobe v0.0.0-20181216042536-5adfd0dc3270
 	github.com/sirupsen/logrus v1.2.0
 	github.com/stretchr/testify v1.2.2
 	golang.org/x/crypto v0.0.0-20181203042331-505ab145d0a9 // indirect

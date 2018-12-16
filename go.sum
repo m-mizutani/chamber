@@ -25,6 +25,8 @@ github.com/m-mizutani/generalprobe v0.0.0-20181201022045-d2316b6ecdf3 h1:Vca9u4K
 github.com/m-mizutani/generalprobe v0.0.0-20181201022045-d2316b6ecdf3/go.mod h1:pLe/raOjkORpsGtKxDLER3U5vRdqshUEiXUoiBjtUzA=
 github.com/m-mizutani/generalprobe v0.0.0-20181215092048-efcbedccf0e2 h1:mZXGcpjaGACVuCyYwklGYjl+dAvKRHjU26NGanG4g10=
 github.com/m-mizutani/generalprobe v0.0.0-20181215092048-efcbedccf0e2/go.mod h1:pLe/raOjkORpsGtKxDLER3U5vRdqshUEiXUoiBjtUzA=
+github.com/m-mizutani/generalprobe v0.0.0-20181216042536-5adfd0dc3270 h1:Hd6eoaUPv4N2Ae+bLnMA4QmKCHc57BtFupbW22wWy9s=
+github.com/m-mizutani/generalprobe v0.0.0-20181216042536-5adfd0dc3270/go.mod h1:pLe/raOjkORpsGtKxDLER3U5vRdqshUEiXUoiBjtUzA=
 github.com/mattn/go-colorable v0.0.9/go.mod h1:9vuHe8Xs5qXnSaW/c/ABM9alt+Vo+STaOChaDxuIBZU=
 github.com/mattn/go-isatty v0.0.4/go.mod h1:M+lRXTBqGeGNdLjl/ufCoiOlB5xdOkqRJdNxMWT7Zi4=
 github.com/pkg/errors v0.8.0 h1:WdK/asTD0HN+q6hsWO3/vpuAkAr+tw6aNJNDFFf0+qw=

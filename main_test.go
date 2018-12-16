@@ -17,9 +17,10 @@ import (
 )
 
 type parameter struct {
-	StackName        string `json:"StackName"`
+	StackName        string
 	AwsRegion        string `json:"Region"`
-	KinesisStreamArn string `json:"KinesisStreamArn"`
+	KinesisStreamArn string
+	LambdaArn        string
 }
 
 func newParameter() parameter {
@@ -66,9 +67,9 @@ func TestMain(t *testing.T) {
 
 	g := gp.New(param.AwsRegion, param.StackName)
 	g.AddScenes([]gp.Scene{
-		gp.PutKinesisStreamRecord(g.LogicalID("ResultStream"), rawData),
+		gp.PutKinesisStreamRecord(g.Arn(param.KinesisStreamArn), rawData),
 		gp.AdLib(func() {
-			logs := g.SearchLambdaLogs(g.LogicalID("Tester"), id)
+			logs := g.SearchLambdaLogs(g.Arn(param.LambdaArn), id)
 			fmt.Println(logs)
 			assert.NotEqual(t, 0, len(logs))
 		}),

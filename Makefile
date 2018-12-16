@@ -1,13 +1,13 @@
-CONFIG_FILE ?= "param.json"
+CHAMBER_CONFIG ?= "param.json"
 
-STACK_NAME := $(shell cat $(CONFIG_FILE) | jq '.["StackName"]' -r)
-CODE_S3_BUCKET := $(shell cat $(CONFIG_FILE) | jq '.["CodeS3Bucket"]' -r)
-CODE_S3_PREFIX := $(shell cat $(CONFIG_FILE) | jq '.["CodeS3Prefix"]' -r)
+STACK_NAME := $(shell cat $(CHAMBER_CONFIG) | jq '.["StackName"]' -r)
+CODE_S3_BUCKET := $(shell cat $(CHAMBER_CONFIG) | jq '.["CodeS3Bucket"]' -r)
+CODE_S3_PREFIX := $(shell cat $(CHAMBER_CONFIG) | jq '.["CodeS3Prefix"]' -r)
 
-LAMBDA_ROLE_ARN    := $(shell cat $(CONFIG_FILE) | jq '.["LambdaRoleArn"]' -r)
-LAMBDA_ARN         := $(shell cat $(CONFIG_FILE) | jq '.["LambdaArn"]' -r)
-DLQ_SNS_ARN        := $(shell cat $(CONFIG_FILE) | jq '.["DlqSnsArn"]' -r)
-KINESIS_STREAM_ARN := $(shell cat $(CONFIG_FILE) | jq '.["KinesisStreamArn"]' -r)
+LAMBDA_ROLE_ARN    := $(shell cat $(CHAMBER_CONFIG) | jq '.["LambdaRoleArn"]' -r)
+LAMBDA_ARN         := $(shell cat $(CHAMBER_CONFIG) | jq '.["LambdaArn"]' -r)
+DLQ_SNS_ARN        := $(shell cat $(CHAMBER_CONFIG) | jq '.["DlqSnsArn"]' -r)
+KINESIS_STREAM_ARN := $(shell cat $(CHAMBER_CONFIG) | jq '.["KinesisStreamArn"]' -r)
 
 
 PARAMETERS=LambdaRoleArn=$(LAMBDA_ROLE_ARN) LambdaArn=$(LAMBDA_ARN) DlqSnsArn=$(DLQ_SNS_ARN) KinesisStreamArn=$(KINESIS_STREAM_ARN)
