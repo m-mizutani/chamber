@@ -13,6 +13,9 @@ Parameters:
   LambdaRoleArn:
     Type: String
     Default: ""
+  WhitePrefixList:
+    Type: String
+    Default: ""
 
 Conditions:
   LambdaRoleRequired:
@@ -35,6 +38,8 @@ Resources:
         Variables:
           TARGET_LAMBDA_ARN:
             Ref: LambdaArn
+          WHITE_PREFIX_LIST:
+            Ref: WhitePrefixList
       Events:
         EventStream:
           Type: Kinesis
@@ -42,7 +47,7 @@ Resources:
             Stream:
               Ref: KinesisStreamArn
             StartingPosition: TRIM_HORIZON
-            BatchSize: 10
+            BatchSize: 16
 
   Catcher:
     Type: AWS::Serverless::Function
