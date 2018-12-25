@@ -8,9 +8,10 @@ LAMBDA_ROLE_ARN    := $(shell cat $(CHAMBER_CONFIG) | jq '.["LambdaRoleArn"]' -r
 LAMBDA_ARN         := $(shell cat $(CHAMBER_CONFIG) | jq '.["LambdaArn"]' -r)
 DLQ_SNS_ARN        := $(shell cat $(CHAMBER_CONFIG) | jq '.["DlqSnsArn"]' -r)
 KINESIS_STREAM_ARN := $(shell cat $(CHAMBER_CONFIG) | jq '.["KinesisStreamArn"]' -r)
+WHITE_PREFIX_LIST  := $(shell cat $(CHAMBER_CONFIG) | jq '.["WhitePrefixList"]' -r)
 
 
-PARAMETERS=LambdaRoleArn=$(LAMBDA_ROLE_ARN) LambdaArn=$(LAMBDA_ARN) DlqSnsArn=$(DLQ_SNS_ARN) KinesisStreamArn=$(KINESIS_STREAM_ARN)
+PARAMETERS=LambdaRoleArn=$(LAMBDA_ROLE_ARN) LambdaArn=$(LAMBDA_ARN) DlqSnsArn=$(DLQ_SNS_ARN) KinesisStreamArn=$(KINESIS_STREAM_ARN) WhitePrefixList=$(WHITE_PREFIX_LIST)
 TEMPLATE_FILE=template.yml
 FUNCTIONS=build/dispatcher build/catcher build/reloader
 
@@ -30,9 +31,7 @@ test:
 	go test -v ./functions/catcher/
 	go test -v ./functions/reloader/
 
-build: $(FUNCTIONS)
-
-sam.yml: build template.yml
+sam.yml: $(FUNCTIONS) template.yml
 	aws cloudformation package \
 		--template-file $(TEMPLATE_FILE) \
 		--s3-bucket $(CODE_S3_BUCKET) \

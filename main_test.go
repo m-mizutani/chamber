@@ -2,7 +2,6 @@ package main_test
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -70,7 +69,62 @@ func TestMain(t *testing.T) {
 		gp.PutKinesisStreamRecord(g.Arn(param.KinesisStreamArn), rawData),
 		gp.AdLib(func() {
 			logs := g.SearchLambdaLogs(g.Arn(param.LambdaArn), id)
-			fmt.Println(logs)
+			assert.NotEqual(t, 0, len(logs))
+		}),
+	})
+	g.Act()
+}
+
+func TestWhiteList1(t *testing.T) {
+	param := newParameter()
+	log.WithField("param", param).Info("start")
+	id := uuid.New().String()
+
+	var ev events.S3Event
+	ev.Records = []events.S3EventRecord{
+		events.S3EventRecord{
+			S3: events.S3Entity{
+				Bucket: events.S3Bucket{Name: "whitelist"},
+				Object: events.S3Object{Key: "test1/" + id},
+			},
+		},
+	}
+	rawData, err := json.Marshal(ev)
+	require.NoError(t, err)
+
+	g := gp.New(param.AwsRegion, param.StackName)
+	g.AddScenes([]gp.Scene{
+		gp.PutKinesisStreamRecord(g.Arn(param.KinesisStreamArn), rawData),
+		gp.AdLib(func() {
+			logs := g.SearchLambdaLogs(g.Arn(param.LambdaArn), id)
+			assert.Equal(t, 0, len(logs))
+		}),
+	})
+	g.Act()
+}
+
+func TestWhiteList2(t *testing.T) {
+	param := newParameter()
+	log.WithField("param", param).Info("start")
+	id := uuid.New().String()
+
+	var ev events.S3Event
+	ev.Records = []events.S3EventRecord{
+		events.S3EventRecord{
+			S3: events.S3Entity{
+				Bucket: events.S3Bucket{Name: "whitelist"},
+				Object: events.S3Object{Key: id},
+			},
+		},
+	}
+	rawData, err := json.Marshal(ev)
+	require.NoError(t, err)
+
+	g := gp.New(param.AwsRegion, param.StackName)
+	g.AddScenes([]gp.Scene{
+		gp.PutKinesisStreamRecord(g.Arn(param.KinesisStreamArn), rawData),
+		gp.AdLib(func() {
+			logs := g.SearchLambdaLogs(g.Arn(param.LambdaArn), id)
 			assert.NotEqual(t, 0, len(logs))
 		}),
 	})
