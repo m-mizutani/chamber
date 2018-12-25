@@ -97,7 +97,7 @@ func TestWhiteList1(t *testing.T) {
 		gp.PutKinesisStreamRecord(g.Arn(param.KinesisStreamArn), rawData),
 		gp.AdLib(func() {
 			logs := g.SearchLambdaLogs(g.Arn(param.LambdaArn), id)
-			assert.Equal(t, 0, len(logs))
+			assert.NotEqual(t, 0, len(logs))
 		}),
 	})
 	g.Act()
@@ -125,7 +125,7 @@ func TestWhiteList2(t *testing.T) {
 		gp.PutKinesisStreamRecord(g.Arn(param.KinesisStreamArn), rawData),
 		gp.AdLib(func() {
 			logs := g.SearchLambdaLogs(g.Arn(param.LambdaArn), id)
-			assert.NotEqual(t, 0, len(logs))
+			assert.Equal(t, 0, len(logs))
 		}),
 	})
 	g.Act()

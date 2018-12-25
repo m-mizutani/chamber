@@ -76,6 +76,8 @@ func invokeLambda(s3record events.S3EventRecord, lambdaArn string, svc *lambdaSe
 func handler(args argument) (result, error) {
 	var res result
 
+	logger.WithField("args", args).Info("Start function")
+
 	ssn := session.Must(session.NewSession(&aws.Config{
 		Region: aws.String(args.awsRegion),
 	}))
@@ -95,7 +97,7 @@ func handler(args argument) (result, error) {
 		for _, s3record := range s3event.Records {
 			logger.WithField("s3record", s3record).Info("S3 record")
 
-			if matchWhiteList(s3record, args.whitePrefixList) {
+			if len(args.whitePrefixList) > 0 && !matchWhiteList(s3record, args.whitePrefixList) {
 				continue
 			}
 
