@@ -47,7 +47,6 @@ func matchWhiteList(s3record events.S3EventRecord, whitelist []string) bool {
 }
 
 func invokeLambda(s3record events.S3EventRecord, lambdaArn string, svc *lambdaService.Lambda) error {
-
 	ev := events.S3Event{[]events.S3EventRecord{s3record}}
 	rawData, err := json.Marshal(ev)
 	if err != nil {

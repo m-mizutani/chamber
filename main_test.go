@@ -130,3 +130,35 @@ func TestWhiteList2(t *testing.T) {
 	})
 	g.Act()
 }
+
+func TestError(t *testing.T) {
+	param := newParameter()
+	log.WithField("param", param).Info("start")
+	id := uuid.New().String()
+
+	var ev events.S3Event
+	ev.Records = []events.S3EventRecord{
+		events.S3EventRecord{
+			EventName: "error",
+			S3: events.S3Entity{
+				Bucket: events.S3Bucket{Name: "test-bucket"},
+				Object: events.S3Object{Key: id},
+			},
+		},
+	}
+	rawData, err := json.Marshal(ev)
+	require.NoError(t, err)
+
+	g := gp.New(param.AwsRegion, param.StackName)
+	g.AddScenes([]gp.Scene{
+		gp.PutKinesisStreamRecord(g.Arn(param.KinesisStreamArn), rawData),
+		gp.AdLib(func() {
+			logs1 := g.SearchLambdaLogs(g.LogicalID("Catcher"), "")
+			assert.NotEqual(t, 0, len(logs1))
+
+			logs2 := g.SearchLambdaLogs(g.Arn(param.LambdaArn), id)
+			assert.NotEqual(t, 0, len(logs2)) // Not invoked
+		}),
+	})
+	g.Act()
+}

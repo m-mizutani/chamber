@@ -63,6 +63,13 @@ Resources:
         Variables:
           ERROR_TABLE:
             Ref: ErrorTable
+      Events:
+        DLQ:
+          Type: SNS
+          Properties:
+            Topic:
+              Ref: DlqSnsArn
+
 
   Reloader:
     Type: AWS::Serverless::Function
@@ -78,14 +85,14 @@ Resources:
         Variables:
           ERROR_TABLE:
             Ref: ErrorTable
-      Events:
-        ErrorTable:
-          Type: DynamoDB
-          Properties:
-            Stream:
-              Fn::GetAtt: ErrorTable.StreamArn
-            StartingPosition: TRIM_HORIZON
-            BatchSize: 10
+#      Events:
+#        ErrorTable:
+#          Type: DynamoDB
+#          Properties:
+#            Stream:
+#              Fn::GetAtt: ErrorTable.StreamArn
+#            StartingPosition: TRIM_HORIZON
+#            BatchSize: 10
 
   # ----------------------------------------
   # DynamoDB

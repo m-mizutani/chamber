@@ -23,6 +23,10 @@ Resources:
       Role:
         Fn::If: [ LambdaRoleRequired, {"Fn::GetAtt": LambdaRole.Arn}, {Ref: LambdaRoleArn} ]
       CodeUri: .
+      DeadLetterQueue:
+        Type: SNS
+        TargetArn:
+          Ref: DLQ
   DLQ:
     Type: AWS::SNS::Topic
     Properties:
