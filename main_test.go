@@ -144,6 +144,15 @@ func TestWhiteList2(t *testing.T) {
 	g.Run()
 }
 
+type errorTableRecord struct {
+	S3Key        string    `dynamo:"s3key"`
+	OccurredAt   time.Time `dynamo:"occurred_at"`
+	RequestID    string    `dynamo:"request_id"`
+	ErrorMessage string    `dynamo:"error_message"`
+	S3Event      []byte    `dynamo:"s3event"`
+	ErrorCount   int       `dynamo:"error_count"`
+}
+
 func TestFireDLQ(t *testing.T) {
 	param := newParameter()
 	log.WithField("param", param).Info("start")
@@ -163,14 +172,6 @@ func TestFireDLQ(t *testing.T) {
 	rawData, err := json.Marshal(ev)
 	require.NoError(t, err)
 
-	type errorRecord struct {
-		S3Key        string    `dynamo:"s3key"`
-		OccurredAt   time.Time `dynamo:"occurred_at"`
-		RequestID    string    `dynamo:"request_id"`
-		ErrorMessage string    `dynamo:"error_message"`
-		S3Event      []byte    `dynamo:"s3event"`
-	}
-
 	g := gp.New(param.AwsRegion, param.StackName)
 	g.AddScenes([]gp.Scene{
 		gp.PutKinesisStreamRecord(g.Arn(param.KinesisStreamArn), rawData),
@@ -189,7 +190,7 @@ func TestFireDLQ(t *testing.T) {
 			assert.NotEqual(t, 0, len(logs2))
 		}),
 		gp.GetDynamoRecord(g.LogicalID("ErrorTable"), func(table dynamo.Table) bool {
-			var errRecord errorRecord
+			var errRecord errorTableRecord
 			key := bucketName + "/" + id
 
 			err := table.Get("s3key", key).One(&errRecord)
@@ -221,14 +222,6 @@ func TestCatcher(t *testing.T) {
 	s3Msg, err := json.Marshal(s3Event)
 	require.NoError(t, err)
 
-	type errorRecord struct {
-		S3Key        string    `dynamo:"s3key"`
-		OccurredAt   time.Time `dynamo:"occurred_at"`
-		RequestID    string    `dynamo:"request_id"`
-		ErrorMessage string    `dynamo:"error_message"`
-		S3Event      []byte    `dynamo:"s3event"`
-	}
-
 	attr := sns.MessageAttributeValue{}
 	attr.SetDataType("String")
 	attr.SetStringValue("Blue")
@@ -251,12 +244,74 @@ func TestCatcher(t *testing.T) {
 		}),
 
 		gp.GetDynamoRecord(g.LogicalID("ErrorTable"), func(table dynamo.Table) bool {
-			var errRecord errorRecord
+			var errRecord errorTableRecord
 			key := bucketName + "/" + id
 
 			err := table.Get("s3key", key).One(&errRecord)
 			assert.NoError(t, err)
 			assert.Equal(t, "Blue", errRecord.ErrorMessage)
+
+			return true
+		}),
+	})
+
+	g.Run()
+}
+
+func TestCountUp(t *testing.T) {
+	param := newParameter()
+	log.WithField("param", param).Info("start")
+	id := uuid.New().String()
+
+	bucketName := "test-bucket"
+	var s3Event events.S3Event
+	s3Event.Records = []events.S3EventRecord{
+		events.S3EventRecord{
+			S3: events.S3Entity{
+				Bucket: events.S3Bucket{Name: bucketName},
+				Object: events.S3Object{Key: id},
+			},
+		},
+	}
+
+	s3Msg, err := json.Marshal(s3Event)
+	require.NoError(t, err)
+
+	attr := sns.MessageAttributeValue{}
+	attr.SetDataType("String")
+	attr.SetStringValue("Blue")
+	snsAttrs := map[string]*sns.MessageAttributeValue{
+		"ErrorMessage": &attr,
+	}
+
+	g := gp.New(param.AwsRegion, param.StackName)
+	// gp.SetLoggerDebugLevel()
+	g.AddScenes([]gp.Scene{
+		gp.PublishSnsMessageWithAttributes(g.Arn(param.DlqSnsArn), s3Msg, snsAttrs),
+		gp.GetDynamoRecord(g.LogicalID("ErrorTable"), func(table dynamo.Table) bool {
+			var errRecord errorTableRecord
+			key := bucketName + "/" + id
+
+			err := table.Get("s3key", key).One(&errRecord)
+			assert.NoError(t, err)
+			if 1 != errRecord.ErrorCount {
+				return false
+			}
+
+			return true
+		}),
+
+		// Send second (dummy) DLQ message, then error_count should be count up.
+		gp.PublishSnsMessageWithAttributes(g.Arn(param.DlqSnsArn), s3Msg, snsAttrs),
+		gp.GetDynamoRecord(g.LogicalID("ErrorTable"), func(table dynamo.Table) bool {
+			var errRecord errorTableRecord
+			key := bucketName + "/" + id
+
+			err := table.Get("s3key", key).One(&errRecord)
+			assert.NoError(t, err)
+			if 2 != errRecord.ErrorCount {
+				return false
+			}
 
 			return true
 		}),

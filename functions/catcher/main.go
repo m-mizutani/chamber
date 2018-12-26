@@ -6,13 +6,14 @@ import (
 	"os"
 	"time"
 
-	"github.com/guregu/dynamo"
-	"github.com/sirupsen/logrus"
-
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/guregu/dynamo"
+	"github.com/sirupsen/logrus"
 )
 
 var logger = logrus.New()
@@ -95,21 +96,44 @@ func handleEvent(record events.SNSEventRecord, table dynamo.Table) *errorInfo {
 	}
 
 	s3record := s3event.Records[0]
+	s3Key := s3record.S3.Bucket.Name + "/" + s3record.S3.Object.Key
 	rec := errorRecord{
-		S3Key:        s3record.S3.Bucket.Name + "/" + s3record.S3.Object.Key,
+		S3Key:        s3Key,
 		OccurredAt:   record.SNS.Timestamp,
 		ErrorMessage: errMsg.Value,
+		ErrorCount:   1,
 		S3Event:      s3Msg,
 	}
 
 	err = table.Put(rec).If("attribute_not_exists(s3key)").Run()
 	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			if aerr.Code() == dynamodb.ErrCodeConditionalCheckFailedException {
+				var newRecord errorRecord
+				err = table.Update("s3key", s3Key).Add("error_count", 1).Value(&newRecord)
+
+				if err != nil {
+					logger.WithFields(logrus.Fields{
+						"error":  err,
+						"record": rec,
+					}).Error("Fail to update error count")
+					return errInfo
+				}
+
+				logger.WithField("new", newRecord).Info("Updated the existing record")
+
+				return nil
+			}
+		}
+
 		logger.WithFields(logrus.Fields{
 			"error":  err,
 			"record": rec,
 		}).Error("Fail to put error data")
 		return errInfo
 	}
+
+	logger.WithField("new", rec).Info("Inserted a new record")
 
 	return nil
 }
