@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"time"
 
 	"github.com/guregu/dynamo"
 	"github.com/sirupsen/logrus"
@@ -17,8 +18,14 @@ import (
 var logger = logrus.New()
 
 type result struct {
-	Result string `json:"result"`
-	Done   int    `json:"done"`
+	Result string       `json:"result"`
+	Done   int          `json:"done"`
+	Errors []*errorInfo `json:"errors"`
+}
+
+type errorInfo struct {
+	Error   error          `json:"error"`
+	S3Event events.S3Event `json:"s3event"`
 }
 
 type argument struct {
@@ -28,15 +35,83 @@ type argument struct {
 }
 
 type errorRecord struct {
-	S3Key        string `dynamo:"s3key"`
-	RequestID    string `dynamo:"request_id"`
-	ErrorMessage string `dynamo:"error_message"`
-	S3Event      string `dynamo:"s3event"`
+	S3Key        string    `dynamo:"s3key"`
+	OccurredAt   time.Time `dynamo:"occurred_at"`
+	RequestID    string    `dynamo:"request_id"`
+	ErrorMessage string    `dynamo:"error_message"`
+	S3Event      []byte    `dynamo:"s3event"`
+	ErrorCount   int       `dynamo:"error_count"`
 }
 
 type messageAttribute struct {
 	Type  string
 	Value string
+}
+
+func decodeViaJson(src interface{}, dst interface{}) error {
+	rawData, err := json.Marshal(src)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(rawData, dst)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func handleEvent(record events.SNSEventRecord, table dynamo.Table) *errorInfo {
+	errInfo := &errorInfo{nil, events.S3Event{}}
+
+	errMsgEntity, ok := record.SNS.MessageAttributes["ErrorMessage"]
+	if !ok {
+		logger.WithField("record", record).Warn("No ErrorMessage")
+		return errInfo
+	}
+
+	var errMsg messageAttribute
+	err := decodeViaJson(errMsgEntity, &errMsg)
+	if err != nil {
+		logger.WithField("errMsgEntity", errMsgEntity).Warn("ErrorMessage can not be converted to MessageAttribute")
+		return errInfo
+	}
+
+	s3Msg := []byte(record.SNS.Message)
+	var s3event events.S3Event
+	err = json.Unmarshal(s3Msg, &s3event)
+	if err != nil {
+		logger.WithFields(logrus.Fields{
+			"message": record.SNS.Message,
+			"error":   err,
+		}).Error("Fail to parse json as S3 event")
+		return errInfo
+	}
+
+	if len(s3event.Records) != 1 {
+		logger.WithField("event", s3event).Error("S3 record size is not 1")
+		return errInfo
+	}
+
+	s3record := s3event.Records[0]
+	rec := errorRecord{
+		S3Key:        s3record.S3.Bucket.Name + "/" + s3record.S3.Object.Key,
+		OccurredAt:   record.SNS.Timestamp,
+		ErrorMessage: errMsg.Value,
+		S3Event:      s3Msg,
+	}
+
+	err = table.Put(rec).If("attribute_not_exists(s3key)").Run()
+	if err != nil {
+		logger.WithFields(logrus.Fields{
+			"error":  err,
+			"record": rec,
+		}).Error("Fail to put error data")
+		return errInfo
+	}
+
+	return nil
 }
 
 func handler(args argument) (result, error) {
@@ -47,42 +122,9 @@ func handler(args argument) (result, error) {
 	table := db.Table(args.errorTable)
 
 	for _, record := range args.event.Records {
-		errMsgEntity, ok := record.SNS.MessageAttributes["ErrorMessage"]
-		if !ok {
-			logger.WithField("record", record).Warn("No ErrorMessage")
-			continue
-		}
-
-		errMsg, ok := errMsgEntity.(messageAttribute)
-		if !ok {
-			logger.WithField("errMsgEntity", errMsgEntity).Warn("ErrorMessage is not MessageAttribute")
-			continue
-		}
-
-		var s3event events.S3Event
-		err := json.Unmarshal([]byte(record.SNS.Message), &s3event)
-		if err != nil {
-			logger.WithFields(logrus.Fields{
-				"message": record.SNS.Message,
-				"error":   err,
-			}).Error("Fail to parse json as S3 event")
-			continue
-		}
-
-		if len(s3event.Records) != 1 {
-			logger.WithField("event", s3event).Error("S3 record size is not 1")
-			continue
-		}
-
-		record := s3event.Records[0]
-		rec := errorRecord{
-			S3Key:        record.S3.Bucket.Name + "/" + record.S3.Object.Key,
-			ErrorMessage: errMsg.Value,
-		}
-
-		err = table.Put(rec).Run()
-		if err != nil {
-			logger.WithField("error", err).Warn("Fail to put error data")
+		errInfo := handleEvent(record, table)
+		if errInfo != nil {
+			res.Errors = append(res.Errors, errInfo)
 		}
 	}
 

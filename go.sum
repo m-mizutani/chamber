@@ -35,8 +35,16 @@ github.com/m-mizutani/generalprobe v0.0.0-20181220092341-101c2969f267 h1:VKSWg+G
 github.com/m-mizutani/generalprobe v0.0.0-20181220092341-101c2969f267/go.mod h1:pLe/raOjkORpsGtKxDLER3U5vRdqshUEiXUoiBjtUzA=
 github.com/m-mizutani/generalprobe v0.0.0-20181225021847-d4e9eb69abd3 h1:5DH7mDCo6FoHPd98NfZXUhz6UwcDHXeJ/zzj3Fo0/bQ=
 github.com/m-mizutani/generalprobe v0.0.0-20181225021847-d4e9eb69abd3/go.mod h1:pLe/raOjkORpsGtKxDLER3U5vRdqshUEiXUoiBjtUzA=
+github.com/m-mizutani/generalprobe v0.0.0-20181226002611-4a1d27fabbc8 h1:ni4nGy3cluSWU2Bwb+QHoaqqSjNq0PkIOrwpVbMeZvE=
+github.com/m-mizutani/generalprobe v0.0.0-20181226002611-4a1d27fabbc8/go.mod h1:pLe/raOjkORpsGtKxDLER3U5vRdqshUEiXUoiBjtUzA=
+github.com/m-mizutani/generalprobe v0.0.0-20181226052742-f2b5cf681cf0 h1:ld9SsQph0Mj1noABtTyhImujQRoRJJ3sSoTh4c5pA0A=
+github.com/m-mizutani/generalprobe v0.0.0-20181226052742-f2b5cf681cf0/go.mod h1:pLe/raOjkORpsGtKxDLER3U5vRdqshUEiXUoiBjtUzA=
+github.com/m-mizutani/generalprobe v0.0.0-20181226055254-c0d674bd387c h1:IV+LwB4i1+dEq+maBjLoYWE3+/ZBg3lipbmHZetZ8Dc=
+github.com/m-mizutani/generalprobe v0.0.0-20181226055254-c0d674bd387c/go.mod h1:pLe/raOjkORpsGtKxDLER3U5vRdqshUEiXUoiBjtUzA=
 github.com/mattn/go-colorable v0.0.9/go.mod h1:9vuHe8Xs5qXnSaW/c/ABM9alt+Vo+STaOChaDxuIBZU=
 github.com/mattn/go-isatty v0.0.4/go.mod h1:M+lRXTBqGeGNdLjl/ufCoiOlB5xdOkqRJdNxMWT7Zi4=
+github.com/mitchellh/mapstructure v1.1.2 h1:fmNYVwqnSfB9mZU6OS2O6GsXM+wcskZDuKQzvN1EDeE=
+github.com/mitchellh/mapstructure v1.1.2/go.mod h1:FVVH3fgwuzCH5S8UJGiWEs2h04kUh9fWfEaFds41c1Y=
 github.com/pkg/errors v0.8.0 h1:WdK/asTD0HN+q6hsWO3/vpuAkAr+tw6aNJNDFFf0+qw=
 github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
