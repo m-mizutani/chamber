@@ -16,6 +16,9 @@ Parameters:
   WhitePrefixList:
     Type: String
     Default: ""
+  MaxRetry:
+    Type: Number
+    Default: 2
 
 Conditions:
   LambdaRoleRequired:
@@ -83,8 +86,10 @@ Resources:
         Fn::If: [ LambdaRoleRequired, {"Fn::GetAtt": LambdaRole.Arn}, {Ref: LambdaRoleArn} ]
       Environment:
         Variables:
-          ERROR_TABLE:
-            Ref: ErrorTable
+          TARGET_LAMBDA_ARN:
+            Ref: LambdaArn
+          MAX_RETRY:
+            Ref: MaxRetry
       Events:
         ErrorTable:
           Type: DynamoDB

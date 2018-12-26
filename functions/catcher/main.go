@@ -49,7 +49,7 @@ type messageAttribute struct {
 	Value string
 }
 
-func decodeViaJson(src interface{}, dst interface{}) error {
+func decodeViaJSON(src interface{}, dst interface{}) error {
 	rawData, err := json.Marshal(src)
 	if err != nil {
 		return err
@@ -73,7 +73,7 @@ func handleEvent(record events.SNSEventRecord, table dynamo.Table) *errorInfo {
 	}
 
 	var errMsg messageAttribute
-	err := decodeViaJson(errMsgEntity, &errMsg)
+	err := decodeViaJSON(errMsgEntity, &errMsg)
 	if err != nil {
 		logger.WithField("errMsgEntity", errMsgEntity).Warn("ErrorMessage can not be converted to MessageAttribute")
 		return errInfo
@@ -109,6 +109,7 @@ func handleEvent(record events.SNSEventRecord, table dynamo.Table) *errorInfo {
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
 			if aerr.Code() == dynamodb.ErrCodeConditionalCheckFailedException {
+				// Fail to put a new record because the record already exists
 				var newRecord errorRecord
 				err = table.Update("s3key", s3Key).Add("error_count", 1).Value(&newRecord)
 
@@ -126,6 +127,7 @@ func handleEvent(record events.SNSEventRecord, table dynamo.Table) *errorInfo {
 			}
 		}
 
+		// Fail to put a new record other than existing record
 		logger.WithFields(logrus.Fields{
 			"error":  err,
 			"record": rec,
@@ -133,6 +135,7 @@ func handleEvent(record events.SNSEventRecord, table dynamo.Table) *errorInfo {
 		return errInfo
 	}
 
+	// Succeeded to put a new record
 	logger.WithField("new", rec).Info("Inserted a new record")
 
 	return nil

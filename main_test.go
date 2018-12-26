@@ -253,6 +253,15 @@ func TestCatcher(t *testing.T) {
 
 			return true
 		}),
+
+		gp.AdLib(func() {
+			logs := g.SearchLambdaLogs(gp.SearchLambdaLogsArgs{
+				LambdaTarget: g.LogicalID("Reloader"),
+				Filter:       id,
+			})
+
+			assert.NotEqual(t, 0, len(logs))
+		}),
 	})
 
 	g.Run()
