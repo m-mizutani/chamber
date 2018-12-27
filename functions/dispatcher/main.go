@@ -8,10 +8,10 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	lambdaService "github.com/aws/aws-sdk-go/service/lambda"
+
 	"github.com/sirupsen/logrus"
+
+	"github.com/m-mizutani/chamber/functions"
 )
 
 var logger = logrus.New()
@@ -46,41 +46,12 @@ func matchWhiteList(s3record events.S3EventRecord, whitelist []string) bool {
 	return false
 }
 
-func invokeLambda(s3record events.S3EventRecord, lambdaArn string, svc *lambdaService.Lambda) error {
-	ev := events.S3Event{[]events.S3EventRecord{s3record}}
-	rawData, err := json.Marshal(ev)
-	if err != nil {
-		return err
-	}
-
-	input := &lambdaService.InvokeInput{
-		FunctionName:   aws.String(lambdaArn),
-		InvocationType: aws.String("Event"),
-		Payload:        rawData,
-	}
-
-	result, err := svc.Invoke(input)
-	if err != nil {
-		return err
-	}
-
-	logger.WithFields(logrus.Fields{
-		"input":  input,
-		"result": result,
-	}).Info("Invoked")
-
-	return nil
-}
-
 func handler(args argument) (result, error) {
 	var res result
 
 	logger.WithField("args", args).Info("Start function")
 
-	ssn := session.Must(session.NewSession(&aws.Config{
-		Region: aws.String(args.awsRegion),
-	}))
-	svc := lambdaService.New(ssn)
+	invoker := functions.NewLambdaInvoker(args.awsRegion, args.lambdaArn)
 
 	for _, record := range args.event.Records {
 		var s3event events.S3Event
@@ -100,7 +71,7 @@ func handler(args argument) (result, error) {
 				continue
 			}
 
-			err := invokeLambda(s3record, args.lambdaArn, svc)
+			err := invoker.Invoke(s3record)
 			if err != nil {
 				logger.WithFields(logrus.Fields{
 					"error":    err,

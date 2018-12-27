@@ -1,4 +1,4 @@
-module chamber
+module github.com/m-mizutani/chamber
 
 require (
 	github.com/aws/aws-lambda-go v1.8.0
@@ -6,8 +6,8 @@ require (
 	github.com/cenkalti/backoff v2.1.0+incompatible // indirect
 	github.com/google/uuid v1.1.0
 	github.com/guregu/dynamo v1.0.0
-	github.com/m-mizutani/generalprobe v0.0.0-20181226055254-c0d674bd387c
-	github.com/mitchellh/mapstructure v1.1.2 // indirect
+	github.com/m-mizutani/generalprobe v0.0.0-20181227015325-e5fb82cbd3a1
+	github.com/pkg/errors v0.8.0
 	github.com/sirupsen/logrus v1.2.0
 	github.com/stretchr/testify v1.2.2
 	golang.org/x/crypto v0.0.0-20181203042331-505ab145d0a9 // indirect

@@ -11,11 +11,10 @@ import (
 	"github.com/aws/aws-sdk-go/service/sns"
 	"github.com/google/uuid"
 	"github.com/guregu/dynamo"
+	"github.com/m-mizutani/generalprobe"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	gp "github.com/m-mizutani/generalprobe"
-	log "github.com/sirupsen/logrus"
 )
 
 type parameter struct {
@@ -68,15 +67,12 @@ func TestMain(t *testing.T) {
 	rawData, err := json.Marshal(ev)
 	require.NoError(t, err)
 
-	g := gp.New(param.AwsRegion, param.StackName)
-	g.AddScenes([]gp.Scene{
-		gp.PutKinesisStreamRecord(g.Arn(param.KinesisStreamArn), rawData),
-		gp.AdLib(func() {
-			logs := g.SearchLambdaLogs(gp.SearchLambdaLogsArgs{
-				LambdaTarget: g.Arn(param.LambdaArn),
-				Filter:       id,
-			})
-			assert.NotEqual(t, 0, len(logs))
+	g := generalprobe.New(param.AwsRegion, param.StackName)
+	g.AddScenes([]generalprobe.Scene{
+		g.PutKinesisStreamRecord(g.Arn(param.KinesisStreamArn), rawData),
+		g.GetLambdaLogs(g.Arn(param.LambdaArn), id, func(logs []string) bool {
+			assert.Equal(t, 1, len(logs))
+			return true
 		}),
 	})
 	g.Run()
@@ -99,15 +95,13 @@ func TestWhiteList1(t *testing.T) {
 	rawData, err := json.Marshal(ev)
 	require.NoError(t, err)
 
-	g := gp.New(param.AwsRegion, param.StackName)
-	g.AddScenes([]gp.Scene{
-		gp.PutKinesisStreamRecord(g.Arn(param.KinesisStreamArn), rawData),
-		gp.AdLib(func() {
-			logs := g.SearchLambdaLogs(gp.SearchLambdaLogsArgs{
-				LambdaTarget: g.Arn(param.LambdaArn),
-				Filter:       id,
-			})
-			assert.NotEqual(t, 0, len(logs))
+	g := generalprobe.New(param.AwsRegion, param.StackName)
+	g.AddScenes([]generalprobe.Scene{
+		g.PutKinesisStreamRecord(g.Arn(param.KinesisStreamArn), rawData),
+
+		g.GetLambdaLogs(g.Arn(param.LambdaArn), id, func(logs []string) bool {
+			assert.Equal(t, 1, len(logs))
+			return true
 		}),
 	})
 	g.Run()
@@ -130,15 +124,12 @@ func TestWhiteList2(t *testing.T) {
 	rawData, err := json.Marshal(ev)
 	require.NoError(t, err)
 
-	g := gp.New(param.AwsRegion, param.StackName)
-	g.AddScenes([]gp.Scene{
-		gp.PutKinesisStreamRecord(g.Arn(param.KinesisStreamArn), rawData),
-		gp.AdLib(func() {
-			logs := g.SearchLambdaLogs(gp.SearchLambdaLogsArgs{
-				LambdaTarget: g.Arn(param.LambdaArn),
-				Filter:       id,
-			})
+	g := generalprobe.New(param.AwsRegion, param.StackName)
+	g.AddScenes([]generalprobe.Scene{
+		g.PutKinesisStreamRecord(g.Arn(param.KinesisStreamArn), rawData),
+		g.GetLambdaLogs(g.Arn(param.LambdaArn), id, func(logs []string) bool {
 			assert.Equal(t, 0, len(logs))
+			return true
 		}),
 	})
 	g.Run()
@@ -154,6 +145,10 @@ type errorTableRecord struct {
 }
 
 func TestFireDLQ(t *testing.T) {
+	if os.Getenv("CHAMBER_SKIP_DLQ_TEST") != "" {
+		t.Skip()
+	}
+
 	param := newParameter()
 	log.WithField("param", param).Info("start")
 	id := uuid.New().String()
@@ -172,24 +167,21 @@ func TestFireDLQ(t *testing.T) {
 	rawData, err := json.Marshal(ev)
 	require.NoError(t, err)
 
-	g := gp.New(param.AwsRegion, param.StackName)
-	g.AddScenes([]gp.Scene{
-		gp.PutKinesisStreamRecord(g.Arn(param.KinesisStreamArn), rawData),
-		gp.Pause(300),
-		gp.AdLib(func() {
-			logs1 := g.SearchLambdaLogs(gp.SearchLambdaLogsArgs{
-				LambdaTarget: g.LogicalID("Catcher"),
-				Filter:       id,
-			})
-			logs2 := g.SearchLambdaLogs(gp.SearchLambdaLogsArgs{
-				LambdaTarget: g.Arn(param.LambdaArn),
-				Filter:       id,
-			})
+	g := generalprobe.New(param.AwsRegion, param.StackName)
+	g.AddScenes([]generalprobe.Scene{
+		g.PutKinesisStreamRecord(g.Arn(param.KinesisStreamArn), rawData),
 
-			assert.NotEqual(t, 0, len(logs1))
-			assert.NotEqual(t, 0, len(logs2))
-		}),
-		gp.GetDynamoRecord(g.LogicalID("ErrorTable"), func(table dynamo.Table) bool {
+		g.GetLambdaLogs(g.LogicalID("Catcher"), id, func(logs []string) bool {
+			assert.Equal(t, 1, len(logs))
+			return true
+		}).SetInterval(15).SetQueryLimit(30),
+
+		g.GetLambdaLogs(g.Arn(param.LambdaArn), id, func(logs []string) bool {
+			assert.Equal(t, 1, len(logs))
+			return true
+		}).SetInterval(15).SetQueryLimit(30),
+
+		g.GetDynamoRecord(g.LogicalID("ErrorTable"), func(table dynamo.Table) bool {
 			var errRecord errorTableRecord
 			key := bucketName + "/" + id
 
@@ -229,21 +221,17 @@ func TestCatcher(t *testing.T) {
 		"ErrorMessage": &attr,
 	}
 
-	g := gp.New(param.AwsRegion, param.StackName)
-	// gp.SetLoggerDebugLevel()
-	g.AddScenes([]gp.Scene{
-		gp.PublishSnsMessageWithAttributes(g.Arn(param.DlqSnsArn), s3Msg, snsAttrs),
+	g := generalprobe.New(param.AwsRegion, param.StackName)
+	// g.SetLoggerDebugLevel()
+	g.AddScenes([]generalprobe.Scene{
+		g.PublishSnsMessage(g.Arn(param.DlqSnsArn), s3Msg).AddMessageAttributes(snsAttrs),
 
-		gp.AdLib(func() {
-			logs := g.SearchLambdaLogs(gp.SearchLambdaLogsArgs{
-				LambdaTarget: g.LogicalID("Catcher"),
-				Filter:       id,
-			})
-
-			assert.NotEqual(t, 0, len(logs))
+		g.GetLambdaLogs(g.LogicalID("Catcher"), id, func(logs []string) bool {
+			assert.Equal(t, 1, len(logs))
+			return true
 		}),
 
-		gp.GetDynamoRecord(g.LogicalID("ErrorTable"), func(table dynamo.Table) bool {
+		g.GetDynamoRecord(g.LogicalID("ErrorTable"), func(table dynamo.Table) bool {
 			var errRecord errorTableRecord
 			key := bucketName + "/" + id
 
@@ -254,13 +242,10 @@ func TestCatcher(t *testing.T) {
 			return true
 		}),
 
-		gp.AdLib(func() {
-			logs := g.SearchLambdaLogs(gp.SearchLambdaLogsArgs{
-				LambdaTarget: g.LogicalID("Reloader"),
-				Filter:       id,
-			})
-
-			assert.NotEqual(t, 0, len(logs))
+		// Reloader recieves DynamoDB table change record
+		g.GetLambdaLogs(g.LogicalID("Reloader"), id, func(logs []string) bool {
+			assert.Equal(t, 1, len(logs))
+			return true
 		}),
 	})
 
@@ -293,11 +278,12 @@ func TestCountUp(t *testing.T) {
 		"ErrorMessage": &attr,
 	}
 
-	g := gp.New(param.AwsRegion, param.StackName)
-	// gp.SetLoggerDebugLevel()
-	g.AddScenes([]gp.Scene{
-		gp.PublishSnsMessageWithAttributes(g.Arn(param.DlqSnsArn), s3Msg, snsAttrs),
-		gp.GetDynamoRecord(g.LogicalID("ErrorTable"), func(table dynamo.Table) bool {
+	g := generalprobe.New(param.AwsRegion, param.StackName)
+	// g.SetLoggerDebugLevel()
+	g.AddScenes([]generalprobe.Scene{
+		g.PublishSnsMessage(g.Arn(param.DlqSnsArn), s3Msg).AddMessageAttributes(snsAttrs),
+
+		g.GetDynamoRecord(g.LogicalID("ErrorTable"), func(table dynamo.Table) bool {
 			var errRecord errorTableRecord
 			key := bucketName + "/" + id
 
@@ -310,9 +296,21 @@ func TestCountUp(t *testing.T) {
 			return true
 		}),
 
+		g.GetLambdaLogs(g.LogicalID("Reloader"), id, func(logs []string) bool {
+			assert.Equal(t, 1, len(logs))
+			return true
+		}),
+
+		// Target Lambda should be invoked for first time.
+		g.GetLambdaLogs(g.Arn(param.LambdaArn), id, func(logs []string) bool {
+			assert.Equal(t, 1, len(logs))
+			return true
+		}),
+
 		// Send second (dummy) DLQ message, then error_count should be count up.
-		gp.PublishSnsMessageWithAttributes(g.Arn(param.DlqSnsArn), s3Msg, snsAttrs),
-		gp.GetDynamoRecord(g.LogicalID("ErrorTable"), func(table dynamo.Table) bool {
+		g.PublishSnsMessage(g.Arn(param.DlqSnsArn), s3Msg).AddMessageAttributes(snsAttrs),
+
+		g.GetDynamoRecord(g.LogicalID("ErrorTable"), func(table dynamo.Table) bool {
 			var errRecord errorTableRecord
 			key := bucketName + "/" + id
 
@@ -324,6 +322,14 @@ func TestCountUp(t *testing.T) {
 
 			return true
 		}),
+
+		g.Pause(30),
+
+		// Target Lambda should NOT be invoked for the second time.
+		g.GetLambdaLogs(g.Arn(param.LambdaArn), id, func(logs []string) bool {
+			assert.Equal(t, 1, len(logs))
+			return true
+		}).SetQueryLimit(10),
 	})
 
 	g.Run()

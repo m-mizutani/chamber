@@ -18,7 +18,7 @@ Parameters:
     Default: ""
   MaxRetry:
     Type: Number
-    Default: 2
+    Default: 1
 
 Conditions:
   LambdaRoleRequired:
