@@ -5,9 +5,13 @@ import (
 	"encoding/json"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/guregu/dynamo"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
@@ -37,6 +41,17 @@ type errorInfo struct {
 
 func handleRecord(dynamoRecord events.DynamoDBEventRecord, invoker functions.LambdaInvoker, maxRetry uint64) (string, error) {
 	var s3key string
+
+	// Setup dynamoDB accessor
+	tableArnSeq := strings.Split(dynamoRecord.EventSourceArn, "/")
+	if len(tableArnSeq) != 4 {
+		logger.WithField("eventSourceArn", dynamoRecord.EventSourceArn).
+			Error("Invalid EventSourceArn format")
+		return s3key, errors.New("Invalid EventSourceArn format")
+	}
+
+	db := dynamo.New(session.New(), &aws.Config{Region: aws.String(dynamoRecord.AWSRegion)})
+	table := db.Table(tableArnSeq[1])
 
 	// Retrieve S3 key
 	if newKey, ok := dynamoRecord.Change.NewImage["s3key"]; ok {
@@ -72,15 +87,26 @@ func handleRecord(dynamoRecord events.DynamoDBEventRecord, invoker functions.Lam
 			return s3key, errors.Wrap(err, "Fail to parse s3event in dynamoDB record")
 		}
 
-		for _, s3record := range s3event.Records {
-			logger.WithFields(logrus.Fields{
-				"s3record": s3record,
-			}).Info("Invoking lambda")
+		if len(s3event.Records) != 1 {
+			return s3key, errors.New("Invalid S3 record set length, must be 1")
+		}
 
-			err := invoker.Invoke(s3record)
-			if err != nil {
-				return s3key, errors.Wrap(err, "Fail to invoke Lambda")
-			}
+		s3record := s3event.Records[0]
+
+		logger.WithFields(logrus.Fields{
+			"s3record": s3record,
+		}).Info("Invoking lambda")
+
+		// Lock if can
+		err = table.Update("s3key", s3key).Set("retried", true).
+			If("retried = ?", false).Run()
+		if err != nil {
+			return s3key, errors.Wrap(err, "Fail to update target record")
+		}
+
+		err = invoker.Invoke(s3record)
+		if err != nil {
+			return s3key, errors.Wrap(err, "Fail to invoke Lambda")
 		}
 	}
 

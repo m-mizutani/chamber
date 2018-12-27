@@ -18,23 +18,27 @@ import (
 
 var logger = logrus.New()
 
+// result is a returned value of Catcher Lambda function.
 type result struct {
 	Result string       `json:"result"`
 	Done   int          `json:"done"`
 	Errors []*errorInfo `json:"errors"`
 }
 
+// errorInfo is a pair of error and original S3 event.
 type errorInfo struct {
 	Error   error          `json:"error"`
 	S3Event events.S3Event `json:"s3event"`
 }
 
+// argment is a parameters to invoke Catcher
 type argument struct {
 	errorTable string
 	awsRegion  string
 	event      events.SNSEvent
 }
 
+// errorRecord is error information from Main Lambda, not from Catcher
 type errorRecord struct {
 	S3Key        string    `dynamo:"s3key"`
 	OccurredAt   time.Time `dynamo:"occurred_at"`
@@ -42,6 +46,7 @@ type errorRecord struct {
 	ErrorMessage string    `dynamo:"error_message"`
 	S3Event      []byte    `dynamo:"s3event"`
 	ErrorCount   int       `dynamo:"error_count"`
+	Retried      bool      `dynamo:"retried"`
 }
 
 type messageAttribute struct {
@@ -103,6 +108,7 @@ func handleEvent(record events.SNSEventRecord, table dynamo.Table) *errorInfo {
 		ErrorMessage: errMsg.Value,
 		ErrorCount:   1,
 		S3Event:      s3Msg,
+		Retried:      false,
 	}
 
 	err = table.Put(rec).If("attribute_not_exists(s3key)").Run()
@@ -111,7 +117,10 @@ func handleEvent(record events.SNSEventRecord, table dynamo.Table) *errorInfo {
 			if aerr.Code() == dynamodb.ErrCodeConditionalCheckFailedException {
 				// Fail to put a new record because the record already exists
 				var newRecord errorRecord
-				err = table.Update("s3key", s3Key).Add("error_count", 1).Value(&newRecord)
+				err = table.Update("s3key", s3Key).
+					Add("error_count", 1).
+					Set("retried", false).
+					Value(&newRecord)
 
 				if err != nil {
 					logger.WithFields(logrus.Fields{

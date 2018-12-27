@@ -52,7 +52,6 @@ func newParameter() parameter {
 
 func TestMain(t *testing.T) {
 	param := newParameter()
-	log.WithField("param", param).Info("start")
 	id := uuid.New().String()
 
 	var ev events.S3Event
@@ -80,7 +79,6 @@ func TestMain(t *testing.T) {
 
 func TestWhiteList1(t *testing.T) {
 	param := newParameter()
-	log.WithField("param", param).Info("start")
 	id := uuid.New().String()
 
 	var ev events.S3Event
@@ -109,7 +107,6 @@ func TestWhiteList1(t *testing.T) {
 
 func TestWhiteList2(t *testing.T) {
 	param := newParameter()
-	log.WithField("param", param).Info("start")
 	id := uuid.New().String()
 
 	var ev events.S3Event
@@ -142,6 +139,7 @@ type errorTableRecord struct {
 	ErrorMessage string    `dynamo:"error_message"`
 	S3Event      []byte    `dynamo:"s3event"`
 	ErrorCount   int       `dynamo:"error_count"`
+	Retried      bool      `dynamo:"retried"`
 }
 
 func TestFireDLQ(t *testing.T) {
@@ -150,7 +148,6 @@ func TestFireDLQ(t *testing.T) {
 	}
 
 	param := newParameter()
-	log.WithField("param", param).Info("start")
 	id := uuid.New().String()
 
 	bucketName := "test-bucket"
@@ -197,7 +194,6 @@ func TestFireDLQ(t *testing.T) {
 
 func TestCatcher(t *testing.T) {
 	param := newParameter()
-	log.WithField("param", param).Info("start")
 	id := uuid.New().String()
 
 	bucketName := "test-bucket"
@@ -254,7 +250,6 @@ func TestCatcher(t *testing.T) {
 
 func TestCountUp(t *testing.T) {
 	param := newParameter()
-	log.WithField("param", param).Info("start")
 	id := uuid.New().String()
 
 	bucketName := "test-bucket"
