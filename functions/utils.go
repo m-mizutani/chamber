@@ -1,12 +1,16 @@
 package functions
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/lambda"
+
+	"github.com/sirupsen/logrus"
 )
 
 type LambdaInvoker struct {
@@ -46,4 +50,26 @@ func (x *LambdaInvoker) Invoke(s3record events.S3EventRecord) error {
 	}
 
 	return nil
+}
+
+func NewLogger() *logrus.Entry {
+	baseLogger := logrus.New()
+	baseLogger.SetLevel(logrus.InfoLevel)
+	baseLogger.SetFormatter(&logrus.JSONFormatter{})
+
+	return baseLogger.WithFields(logrus.Fields{})
+
+}
+
+func SetLoggerContext(logger *logrus.Entry, ctx context.Context) *logrus.Entry {
+	var requestID string
+
+	if lc, ok := lambdacontext.FromContext(ctx); ok {
+		requestID = lc.AwsRequestID
+	} else {
+		logger.WithField("context", ctx).Warn("Fail to extract lambda context")
+		requestID = "N/A"
+	}
+
+	return logger.WithField("lambda_request_id", requestID)
 }

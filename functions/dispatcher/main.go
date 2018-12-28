@@ -8,13 +8,14 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/aws/aws-lambda-go/lambdacontext"
+	"github.com/pkg/errors"
 
-	"github.com/sirupsen/logrus"
 
 	"github.com/m-mizutani/chamber/functions"
 )
 
-var logger = logrus.New()
+var logger = functions.NewLogger()
 
 type result struct {
 	Result string `json:"result"`
@@ -37,7 +38,7 @@ func matchWhiteList(s3record events.S3EventRecord, whitelist []string) bool {
 			logger.WithFields(logrus.Fields{
 				"prefix": wprefix,
 				"s3":     s3record,
-			}).Info("matched whitelist prefix, skip")
+			}).Info("matched whitelist prefix")
 
 			return true
 		}
@@ -67,7 +68,7 @@ func handler(args argument) (result, error) {
 		for _, s3record := range s3event.Records {
 			logger.WithField("s3record", s3record).Info("S3 record")
 
-			if len(args.whitePrefixList) > 0 && !matchWhiteList(s3record, args.whitePrefixList) {
+			if args.whitePrefixList[0] != "" && !matchWhiteList(s3record, args.whitePrefixList) {
 				continue
 			}
 
@@ -76,31 +77,32 @@ func handler(args argument) (result, error) {
 				logger.WithFields(logrus.Fields{
 					"error":    err,
 					"s3record": s3record,
-				}).Warn("Invoke Error")
+				}).Error("Invoke Error")
+
+				return res, errors.Wrap(err, "Fail to invoke Lambda")
 			}
+
+			res.Done++
 		}
 	}
 
 	return res, nil
 }
 
-func handleRequest(ctx context.Context, event events.KinesisEvent) (result, error) {
-	logger.WithField("event", event).Info("Start")
-
-	args := argument{
-		lambdaArn:       os.Getenv("TARGET_LAMBDA_ARN"),
-		awsRegion:       os.Getenv("AWS_REGION"),
-		whitePrefixList: strings.Split(os.Getenv("WHITE_PREFIX_LIST"), ","),
-		event:           event,
-		ctx:             ctx,
-	}
-
-	return handler(args)
-}
-
 func main() {
-	logger.SetLevel(logrus.InfoLevel)
-	logger.SetFormatter(&logrus.JSONFormatter{})
+	lambda.Start(func (ctx context.Context, event events.KinesisEvent) (result, error) {
+		logger = functions.SetLoggerContext(logger, ctx)
+		logger.WithField("event", event).Info("Start")
 
-	lambda.Start(handleRequest)
+		args := argument{
+			lambdaArn:       os.Getenv("TARGET_LAMBDA_ARN"),
+			awsRegion:       os.Getenv("AWS_REGION"),
+			whitePrefixList: strings.Split(os.Getenv("WHITE_PREFIX_LIST"), ","),
+			event:           event,
+			ctx:             ctx,
+		}
+
+		return handler(args)
+
+	)
 }

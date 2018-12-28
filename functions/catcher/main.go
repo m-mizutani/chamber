@@ -14,9 +14,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/guregu/dynamo"
 	"github.com/sirupsen/logrus"
+
+	"github.com/m-mizutani/chamber/functions"
 )
 
-var logger = logrus.New()
+var logger = functions.NewLogger()
 
 // result is a returned value of Catcher Lambda function.
 type result struct {
@@ -167,19 +169,17 @@ func handler(args argument) (result, error) {
 	return res, nil
 }
 
-func handleRequest(ctx context.Context, event events.SNSEvent) (result, error) {
-	args := argument{
-		errorTable: os.Getenv("ERROR_TABLE"),
-		awsRegion:  os.Getenv("AWS_REGION"),
-		event:      event,
-	}
-
-	return handler(args)
-}
-
 func main() {
-	logger.SetLevel(logrus.InfoLevel)
-	logger.SetFormatter(&logrus.JSONFormatter{})
+	lambda.Start(func(ctx context.Context, event events.SNSEvent) (result, error) {
+		logger = functions.SetLoggerContext(logger, ctx)
+		logger.WithField("event", event).Info("Start")
 
-	lambda.Start(handleRequest)
+		args := argument{
+			errorTable: os.Getenv("ERROR_TABLE"),
+			awsRegion:  os.Getenv("AWS_REGION"),
+			event:      event,
+		}
+
+		return handler(args)
+	})
 }

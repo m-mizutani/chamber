@@ -18,7 +18,7 @@ import (
 	"github.com/m-mizutani/chamber/functions"
 )
 
-var logger = logrus.New()
+var logger = functions.NewLogger()
 
 // argment is a parameters to invoke Catcher
 type argument struct {
@@ -143,20 +143,15 @@ func handler(args argument) (result, error) {
 	return res, nil
 }
 
-func handleRequest(ctx context.Context, event events.DynamoDBEvent) (result, error) {
-	args := argument{
-		LambdaArn: os.Getenv("TARGET_LAMBDA_ARN"),
-		MaxRetry:  os.Getenv("MAX_RETRY"),
-		AwsRegion: os.Getenv("AWS_REGION"),
-		Event:     event,
-	}
-
-	return handler(args)
-}
-
 func main() {
-	logger.SetLevel(logrus.InfoLevel)
-	logger.SetFormatter(&logrus.JSONFormatter{})
+	lambda.Start(func(ctx context.Context, event events.DynamoDBEvent) (result, error) {
+		args := argument{
+			LambdaArn: os.Getenv("TARGET_LAMBDA_ARN"),
+			MaxRetry:  os.Getenv("MAX_RETRY"),
+			AwsRegion: os.Getenv("AWS_REGION"),
+			Event:     event,
+		}
 
-	lambda.Start(handleRequest)
+		return handler(args)
+	})
 }
