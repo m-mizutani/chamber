@@ -8,9 +8,8 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/aws/aws-lambda-go/lambdacontext"
 	"github.com/pkg/errors"
-
+	"github.com/sirupsen/logrus"
 
 	"github.com/m-mizutani/chamber/functions"
 )
@@ -90,7 +89,7 @@ func handler(args argument) (result, error) {
 }
 
 func main() {
-	lambda.Start(func (ctx context.Context, event events.KinesisEvent) (result, error) {
+	lambda.Start(func(ctx context.Context, event events.KinesisEvent) (result, error) {
 		logger = functions.SetLoggerContext(logger, ctx)
 		logger.WithField("event", event).Info("Start")
 
@@ -103,6 +102,5 @@ func main() {
 		}
 
 		return handler(args)
-
-	)
+	})
 }
